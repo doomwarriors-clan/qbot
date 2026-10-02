@@ -208,9 +208,12 @@ async def server_info_poller():
                         else:
                             customiseEmbedForGenericGame(embed, saved_info, saved_players)
                         # Determine winner for a friendly summary
+                        # Print all keys for debugging
+                        print(f"DEBUG match-end {alias}: keys = {list(saved_info.keys())}")
+                        print(f"DEBUG match-end {alias}: all = {saved_info}")
                         if is_team_game:
-                            red_score = saved_info.get('Team_0_Score') or saved_info.get('team_0_score') or '0'
-                            blue_score = saved_info.get('Team_1_Score') or saved_info.get('team_1_score') or '0'
+                            red_score = saved_info.get('Team_0_Score') or saved_info.get('team_0_score') or saved_info.get('team0_score') or '0'
+                            blue_score = saved_info.get('Team_1_Score') or saved_info.get('team_1_score') or saved_info.get('team1_score') or '0'
                         else:
                             red_score = saved_info.get('Red_Score') or saved_info.get('red_score') or '0'
                             blue_score = saved_info.get('Blue_Score') or saved_info.get('blue_score') or '0'
