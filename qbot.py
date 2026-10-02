@@ -163,7 +163,7 @@ async def server_info_poller():
                 last_connected_players[alias] = current_players
 
                 # --- Match-start detection via Score_Time ---
-                current_score_time = serverInfo.get('Score_Time', '')
+                current_score_time = serverInfo.get('score_time', '')
                 previous_score_time = last_score_time.get(alias)
                 if (previous_score_time is not None
                         and not _is_match_running(previous_score_time)
