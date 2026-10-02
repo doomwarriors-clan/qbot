@@ -62,6 +62,10 @@ last_connected_players = {}
 # when a new match starts (transition from "Waiting for Players" to a timer).
 last_score_time = {}
 
+# Tracks the last known serverInfo + playersList while a match was running,
+# so we can post the final result even if scores reset on the next poll.
+last_match_info = {}
+
 # Handle to the background poller task, so it survives re-connections and is
 # not garbage-collected. Populated once in on_ready().
 server_info_task = None
@@ -165,7 +169,11 @@ async def server_info_poller():
                 # --- Match status: post every cycle while a match is running ---
                 current_score_time = serverInfo.get('score_time', '')
                 previous_score_time = last_score_time.get(alias)
-                if _is_match_running(current_score_time) and channel is not None:
+                match_running = _is_match_running(current_score_time)
+                previous_running = (previous_score_time is not None
+                                   and _is_match_running(previous_score_time))
+
+                if match_running and channel is not None:
                     host, port = _parse_alias_target(server)
                     name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
                     currentMap = serverInfo['mapname']
@@ -175,12 +183,43 @@ async def server_info_poller():
                         customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
                     else:
                         customiseEmbedForGenericGame(embed, serverInfo, playersList)
+                    # Add remaining time
+                    embed.add_field(name="Time remaining", value=current_score_time, inline=True)
                     # First detection gets a "Match started" prefix; subsequent
                     # cycles just post the live status.
-                    is_new_match = (previous_score_time is not None
-                                   and not _is_match_running(previous_score_time))
+                    is_new_match = not previous_running
                     prefix = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
                     await channel.send(prefix, embed=embed)
+                    # Save state for potential "match ended" post
+                    last_match_info[alias] = (serverInfo, playersList)
+
+                elif previous_running and not match_running and channel is not None:
+                    # Match just ended — post the final result using saved state
+                    saved = last_match_info.get(alias)
+                    if saved:
+                        saved_info, saved_players = saved
+                        host, port = _parse_alias_target(server)
+                        name = re.sub(nameRegex, '', saved_info['sv_hostname'])
+                        currentMap = saved_info['mapname']
+                        embed = discord.Embed(title=name, description=host+':'+str(port), colour=0x3c9824, type='rich')
+                        is_team_game = saved_info['g_gametype'] in ('3', '4')
+                        if is_team_game:
+                            customiseEmbedForTeamGame(embed, saved_info, saved_players, currentMap)
+                        else:
+                            customiseEmbedForGenericGame(embed, saved_info, saved_players)
+                        # Determine winner for a friendly summary
+                        if is_team_game:
+                            red_score = saved_info.get('Team_0_Score') or saved_info.get('team_0_score') or '0'
+                            blue_score = saved_info.get('Team_1_Score') or saved_info.get('team_1_score') or '0'
+                        else:
+                            red_score = saved_info.get('Red_Score') or saved_info.get('red_score') or '0'
+                            blue_score = saved_info.get('Blue_Score') or saved_info.get('blue_score') or '0'
+                        red_n = int(red_score) if red_score.isdigit() else 0
+                        blue_n = int(blue_score) if blue_score.isdigit() else 0
+                        winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
+                        await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
+                    del last_match_info[alias]
+
                 last_score_time[alias] = current_score_time
 
             except Exception as exc:  # keep the poller alive regardless of one server's errors
