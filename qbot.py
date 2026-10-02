@@ -58,6 +58,10 @@ POLL_INTERVAL = 60
 # time, so we keep the last seen state per server.
 last_connected_players = {}
 
+# Tracks the Score_Time cvar per alias from the previous poll. Used to detect
+# when a new match starts (transition from "Waiting for Players" to a timer).
+last_score_time = {}
+
 # Handle to the background poller task, so it survives re-connections and is
 # not garbage-collected. Populated once in on_ready().
 server_info_task = None
@@ -88,13 +92,11 @@ def _parse_alias_target(server):
     return host, port
 
 
-async def _current_players_for_alias(alias, server):
-    """Query one alias's server and return the set of connected player names.
+async def _query_alias_status(alias, server):
+    """Query one alias's server and return the full ``(serverInfo, playersList)`` tuple.
 
     Returns None when the server could not be reached or its host could not be
-    resolved. Player names are taken from the third element of each parsed
-    player entry (``[score, ping, name]``), matching how the ``!q3`` command
-    treats them.
+    resolved.
     """
     host, port = _parse_alias_target(server)
     if not isValidIp(host):
@@ -106,20 +108,30 @@ async def _current_players_for_alias(alias, server):
     status = await getServerStatus(host, port)
     if status is None:
         return None
-    playersList = status[1]
-    # Strip Quake colour codes (e.g. ``\^1Name``) exactly like the ``!q3`` embeds
-    # do, so the announcement shows the clean display name.
-    return {re.sub(nameRegex, '', player[2]).strip('"') for player in playersList}
+    return status
+
+
+def _is_match_running(score_time: str) -> bool:
+    """Return True when Score_Time indicates an active match (MM:SS countdown).
+
+    OSP sets Score_Time to a countdown like ``19:32`` while a match is in
+    progress and to ``Waiting for Players`` (or similar non-timer text) when
+    no match is active.
+    """
+    return bool(re.match(r'^\d+:\d+$', score_time.strip()))
 
 
 async def server_info_poller():
-    """Background loop that announces new player connections to ``#server-info``.
+    """Background loop that announces player connections and match starts to ``#server-info``.
 
     Runs forever (the bot is expected to live for a long time). Each cycle it
     queries every alias, compares the current player set against the previous
-    cycle's, and posts one message per newly-connected player. The very first
-    poll per server only records a baseline so players already online when the
-    bot starts are not spammed as "connected".
+    cycle's, and posts one message per newly-connected player. It also watches
+    the Score_Time cvar to detect when a new match starts (transition from a
+    non-timer value to a MM:SS countdown) and posts a ``!q3``-style embed.
+    The very first poll per server only records a baseline so players already
+    online when the bot starts are not spammed as "connected" and an
+    already-running match is not re-announced.
     """
     channel = get_server_info_channel()
     if channel is None:
@@ -133,10 +145,14 @@ async def server_info_poller():
 
         for alias, server in aliases.items():
             try:
-                current_players = await _current_players_for_alias(alias, server)
-                if current_players is None:
+                status = await _query_alias_status(alias, server)
+                if status is None:
                     continue  # server offline / unresolvable this cycle
 
+                serverInfo, playersList = status
+
+                # --- Player connection announcements ---
+                current_players = {re.sub(nameRegex, '', p[2]).strip('"') for p in playersList}
                 previous_players = last_connected_players.get(alias)
                 if previous_players is not None:  # skip the first (baseline) poll
                     new_players = current_players - previous_players
@@ -144,8 +160,28 @@ async def server_info_poller():
                         host, port = _parse_alias_target(server)
                         for name in sorted(new_players):
                             await channel.send(f"**{name}** connected to **{alias}** ({host}:{port})")
-
                 last_connected_players[alias] = current_players
+
+                # --- Match-start detection via Score_Time ---
+                current_score_time = serverInfo.get('Score_Time', '')
+                previous_score_time = last_score_time.get(alias)
+                if (previous_score_time is not None
+                        and not _is_match_running(previous_score_time)
+                        and _is_match_running(current_score_time)
+                        and channel is not None):
+                    # A new match has started — build the !q3-style embed
+                    host, port = _parse_alias_target(server)
+                    name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
+                    currentMap = serverInfo['mapname']
+                    embed = discord.Embed(title=name, description=host+':'+str(port), colour=0x3c9824, type='rich')
+                    is_team_game = serverInfo['g_gametype'] in ('3', '4')
+                    if is_team_game:
+                        customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
+                    else:
+                        customiseEmbedForGenericGame(embed, serverInfo, playersList)
+                    await channel.send(f"**Match started** on **{alias}**!", embed=embed)
+                last_score_time[alias] = current_score_time
+
             except Exception as exc:  # keep the poller alive regardless of one server's errors
                 print(f"server-info: error polling {alias}: {exc}")
 
