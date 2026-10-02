@@ -177,7 +177,7 @@ async def server_info_poller():
                     host, port = _parse_alias_target(server)
                     name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
                     currentMap = serverInfo['mapname']
-                    embed = discord.Embed(title=name, description=host+':'+str(port), colour=0x3c9824, type='rich')
+                    embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
                     is_team_game = serverInfo['g_gametype'] in ('3', '4')
                     if is_team_game:
                         customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
@@ -201,7 +201,7 @@ async def server_info_poller():
                         host, port = _parse_alias_target(server)
                         name = re.sub(nameRegex, '', saved_info['sv_hostname'])
                         currentMap = saved_info['mapname']
-                        embed = discord.Embed(title=name, description=host+':'+str(port), colour=0x3c9824, type='rich')
+                        embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
                         is_team_game = saved_info['g_gametype'] in ('3', '4')
                         if is_team_game:
                             customiseEmbedForTeamGame(embed, saved_info, saved_players, currentMap)
@@ -299,7 +299,7 @@ def customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap):
     if len(playersList) > 0:
         playersNumber = str(len(playersList)) + '/' + serverInfo['sv_maxclients']
         # Field 1: full-width, Map + Players combined
-        embed.add_field(name='Map', value=currentMap + '\n' + playersNumber, inline=False)
+        embed.add_field(name='Map', value=f"{currentMap} ({playersNumber})", inline=False)
 
         if 'players_blue' in serverInfo and 'players_red' in serverInfo:
             players_in_blue_team = serverInfo['players_blue'].split()
