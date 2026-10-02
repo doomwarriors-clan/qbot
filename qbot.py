@@ -162,14 +162,10 @@ async def server_info_poller():
                             await channel.send(f"**{name}** connected to **{alias}** ({host}:{port})")
                 last_connected_players[alias] = current_players
 
-                # --- Match-start detection via Score_Time ---
+                # --- Match status: post every cycle while a match is running ---
                 current_score_time = serverInfo.get('score_time', '')
                 previous_score_time = last_score_time.get(alias)
-                if (previous_score_time is not None
-                        and not _is_match_running(previous_score_time)
-                        and _is_match_running(current_score_time)
-                        and channel is not None):
-                    # A new match has started — build the !q3-style embed
+                if _is_match_running(current_score_time) and channel is not None:
                     host, port = _parse_alias_target(server)
                     name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
                     currentMap = serverInfo['mapname']
@@ -179,7 +175,12 @@ async def server_info_poller():
                         customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
                     else:
                         customiseEmbedForGenericGame(embed, serverInfo, playersList)
-                    await channel.send(f"**Match started** on **{alias}**!", embed=embed)
+                    # First detection gets a "Match started" prefix; subsequent
+                    # cycles just post the live status.
+                    is_new_match = (previous_score_time is not None
+                                   and not _is_match_running(previous_score_time))
+                    prefix = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
+                    await channel.send(prefix, embed=embed)
                 last_score_time[alias] = current_score_time
 
             except Exception as exc:  # keep the poller alive regardless of one server's errors
