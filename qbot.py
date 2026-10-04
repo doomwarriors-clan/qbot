@@ -37,6 +37,7 @@ dns.resolver.default_resolver.nameservers = ['1.1.1.1'] #cloudflare dns
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 bot = commands.Bot(command_prefix='!', intents=intents, description='''A simple bot to query Quake 3 servers (protocol 68)''')
 
 aliases = {
@@ -235,6 +236,31 @@ async def on_ready():
     global server_info_task
     if server_info_task is None or server_info_task.done():
         server_info_task = asyncio.create_task(server_info_poller())
+
+
+# --- Welcome new members -------------------------------------------------------
+
+WELCOME_CHANNEL_NAME = 'welcome-area'
+WELCOME_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'welcome_message.txt')
+
+
+@bot.event
+async def on_member_join(member):
+    """Post a welcome message in the 'welcome-area' channel when a new member joins."""
+    channel = next((ch for ch in member.guild.text_channels if ch.name == WELCOME_CHANNEL_NAME), None)
+    if channel is None:
+        return
+
+    try:
+        with open(WELCOME_FILE, 'r', encoding='utf-8') as f:
+            message = f.read().strip()
+    except (FileNotFoundError, IOError):
+        message = "Welcome {user} to the server!"
+        print(f"welcome: {WELCOME_FILE} not found, using default message")
+
+    message = message.replace('{user}', member.mention)
+    await channel.send(message)
+    print(f"welcome: greeted {member} in #{channel.name} of {member.guild.name}")
 
 @bot.command()
 async def alias(context):
