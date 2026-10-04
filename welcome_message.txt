@@ -1,5 +1,7 @@
-{user} — welcome to the doomwarriors community! 🎮
+Hi {user},
 
-Grab a slot on one of our servers and grab your frag. If you have questions, head to #help or ping an admin.
+welcome to the doomwarriors community! 🎮
+
+We are a bunch of seasoned Quake3 gamers and looking for others alike for casual pickup games of Q3 TDM/CTF/duel ... and btw, we also play other, more recent games too. Check Channels Topic Infos for the latest news/events
 
 Have fun and play safe (well, as safe as it gets in Quake 3).
