@@ -215,7 +215,7 @@ async def server_info_poller():
                     if is_team_game:
                         customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
                     else:
-                        customiseEmbedForGenericGame(embed, serverInfo, playersList)
+                        customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
                     # Add remaining time
                     embed.add_field(name="Time remaining", value=current_score_time, inline=True)
                     # First detection gets a "Match started" prefix; subsequent
@@ -239,13 +239,26 @@ async def server_info_poller():
                         if is_team_game:
                             customiseEmbedForTeamGame(embed, saved_info, saved_players, currentMap)
                         else:
-                            customiseEmbedForGenericGame(embed, saved_info, saved_players)
+                            customiseEmbedForGenericGame(embed, saved_info, saved_players, currentMap)
                         # Determine winner for a friendly summary
-                        red_score = saved_info.get('score_red', '0')
-                        blue_score = saved_info.get('score_blue', '0')
-                        red_n = int(red_score) if red_score.isdigit() else 0
-                        blue_n = int(blue_score) if blue_score.isdigit() else 0
-                        winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
+                        if is_team_game:
+                            red_score = saved_info.get('score_red', '0')
+                            blue_score = saved_info.get('score_blue', '0')
+                            red_n = int(red_score) if red_score.isdigit() else 0
+                            blue_n = int(blue_score) if blue_score.isdigit() else 0
+                            winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
+                        else:
+                            # Non-team game (duel): winner is the player with the highest score
+                            best_name, best_score = '—', -1
+                            for p in saved_players:
+                                try:
+                                    s = int(p[0])
+                                except (ValueError, IndexError):
+                                    continue
+                                if s > best_score:
+                                    best_score = s
+                                    best_name = re.sub(nameRegex, '', p[2]).strip('"')
+                            winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
                         await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
                     del last_match_info[alias]
 
@@ -349,7 +362,7 @@ async def q3(context, argument: str):
         if is_team_game:
             customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
         else:
-            customiseEmbedForGenericGame(embed, serverInfo, playersList)
+            customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
 
         await context.send(embed=embed)
 
@@ -380,10 +393,10 @@ def customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap):
         else: # all players in spec
             embed.add_field(name='Spectators', value=buildTeamValue(playersList), inline=False)
 
-def customiseEmbedForGenericGame(embed, serverInfo, playersList):
+def customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap):
     if len(playersList) > 0:
         playersNumber = str(len(playersList)) + '/' + serverInfo['sv_maxclients']
-        embed.add_field(name='Players', value=playersNumber, inline=False)
+        embed.add_field(name='Map', value=f"{currentMap} ({playersNumber})", inline=False)
         addPlayersToEmbed(embed, playersList, 'Player')
 
 def addPlayersToEmbed(embed, playersList, teamName):
