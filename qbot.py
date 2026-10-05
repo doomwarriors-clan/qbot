@@ -54,6 +54,9 @@ nameRegex = r'\^+[a-z0-9]'
 SERVER_INFO_CHANNEL_NAME = "server-info"
 POLL_INTERVAL = 60
 
+# Roles to tag in connection announcements (looked up by name in the guild)
+ANNOUNCE_ROLE_NAMES = ['QUAKER', 'DWC', 'ADMIRAL']
+
 # Tracks the set of connected player names per alias from the previous poll.
 # A player is reported as "connected" only when they appear here for the first
 # time, so we keep the last seen state per server.
@@ -84,6 +87,16 @@ def get_server_info_channel():
             if channel.name == SERVER_INFO_CHANNEL_NAME:
                 return channel
     return None
+
+
+def get_role_mentions(guild):
+    """Return a list of mention strings for the configured announcement roles."""
+    mentions = []
+    for role_name in ANNOUNCE_ROLE_NAMES:
+        role = discord.utils.get(guild.roles, name=role_name)
+        if role is not None:
+            mentions.append(role.mention)
+    return mentions
 
 
 def _parse_alias_target(server):
@@ -163,8 +176,12 @@ async def server_info_poller():
                     new_players = current_players - previous_players
                     if new_players and channel is not None:
                         host, port = _parse_alias_target(server)
+                        role_mentions = " ".join(get_role_mentions(channel.guild))
                         for name in sorted(new_players):
-                            await channel.send(f"**{name}** connected to **{alias}** ({host}:{port})")
+                            msg = f"**{name}** connected to **{alias}** ({host}:{port})"
+                            if role_mentions:
+                                msg += f" {role_mentions}"
+                            await channel.send(msg)
                 last_connected_players[alias] = current_players
 
                 # --- Match status: post every cycle while a match is running ---
