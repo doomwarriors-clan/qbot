@@ -54,8 +54,22 @@ nameRegex = r'\^+[a-z0-9]'
 SERVER_INFO_CHANNEL_NAME = "server-info"
 POLL_INTERVAL = 60
 
-# Roles to tag in connection announcements (looked up by name in the guild)
-ANNOUNCE_ROLE_NAMES = ['QUAKER', 'DWC', 'ADMIRAL']
+# Roles to tag in connection announcements (read from external file)
+ANNOUNCE_ROLE_NAMES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'announce_role_names.txt')
+
+
+def get_announce_role_names():
+    """Read role names from the external config file (one per line).
+
+    Returns an empty list if the file is missing or unreadable.
+    """
+    try:
+        with open(ANNOUNCE_ROLE_NAMES_FILE, 'r', encoding='utf-8') as f:
+            names = [line.strip() for line in f if line.strip()]
+        return names
+    except (FileNotFoundError, IOError) as exc:
+        print(f"announce-roles: could not read {ANNOUNCE_ROLE_NAMES_FILE}: {exc}")
+        return []
 
 # Tracks the set of connected player names per alias from the previous poll.
 # A player is reported as "connected" only when they appear here for the first
@@ -91,8 +105,9 @@ def get_server_info_channel():
 
 def get_role_mentions(guild):
     """Return a list of mention strings for the configured announcement roles."""
+    role_names = get_announce_role_names()
     mentions = []
-    for role_name in ANNOUNCE_ROLE_NAMES:
+    for role_name in role_names:
         role = discord.utils.get(guild.roles, name=role_name)
         if role is not None:
             mentions.append(role.mention)
