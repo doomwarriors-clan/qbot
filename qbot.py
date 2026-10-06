@@ -234,40 +234,41 @@ async def server_info_poller():
                     last_match_info[alias] = (serverInfo, playersList)
 
                 elif previous_running and not match_running and channel is not None:
-                    # Match just ended — post the final result using saved state
-                    saved = last_match_info.get(alias)
-                    if saved:
-                        saved_info, saved_players = saved
-                        host, port = _parse_alias_target(server)
-                        name = re.sub(nameRegex, '', saved_info['sv_hostname'])
-                        currentMap = saved_info['mapname']
-                        embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
-                        is_team_game = saved_info['g_gametype'] in ('3', '4')
-                        if is_team_game:
-                            customiseEmbedForTeamGame(embed, saved_info, saved_players, currentMap)
-                        else:
-                            customiseEmbedForGenericGame(embed, saved_info, saved_players, currentMap)
-                        # Determine winner for a friendly summary
-                        if is_team_game:
-                            red_score = saved_info.get('score_red', '0')
-                            blue_score = saved_info.get('score_blue', '0')
-                            red_n = int(red_score) if red_score.isdigit() else 0
-                            blue_n = int(blue_score) if blue_score.isdigit() else 0
-                            winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
-                        else:
-                            # Non-team game (duel): winner is the player with the highest score
-                            best_name, best_score = '—', -1
-                            for p in saved_players:
-                                try:
-                                    s = int(p[0])
-                                except (ValueError, IndexError):
-                                    continue
-                                if s > best_score:
-                                    best_score = s
-                                    best_name = re.sub(nameRegex, '', p[2]).strip('"')
-                            winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
-                        await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
-                    del last_match_info[alias]
+                    # Match just ended — use the *current* poll's data (server still
+                    # responds, just no longer in a match) for the final score.
+                    host, port = _parse_alias_target(server)
+                    name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
+                    currentMap = serverInfo['mapname']
+                    embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
+                    is_team_game = serverInfo['g_gametype'] in ('3', '4')
+                    if is_team_game:
+                        customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
+                    else:
+                        customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
+                    # Determine winner for a friendly summary
+                    if is_team_game:
+                        red_score = serverInfo.get('score_red', '0')
+                        blue_score = serverInfo.get('score_blue', '0')
+                        red_n = int(red_score) if red_score.isdigit() else 0
+                        blue_n = int(blue_score) if blue_score.isdigit() else 0
+                        winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
+                    else:
+                        # Non-team game (duel): winner is the player with the highest score
+                        best_name, best_score = '—', -1
+                        for p in playersList:
+                            try:
+                                s = int(p[0])
+                            except (ValueError, IndexError):
+                                continue
+                            if s > best_score:
+                                best_score = s
+                                best_name = re.sub(nameRegex, '', p[2]).strip('"')
+                        winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
+                    await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
+                    # Clean up live message and state
+                    if alias in live_match_messages:
+                        del live_match_messages[alias]
+                    last_match_info.pop(alias, None)
                     live_match_messages.pop(alias, None)
 
                 last_score_time[alias] = current_score_time
