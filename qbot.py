@@ -52,7 +52,7 @@ nameRegex = r'\^+[a-z0-9]'
 # and, whenever a new player appears in a server's player list, posts a message
 # to the configured text channel announcing the connection.
 SERVER_INFO_CHANNEL_NAME = "server-info"
-POLL_INTERVAL = 60
+POLL_INTERVAL = 10
 
 # Roles to tag in connection announcements (read from external file)
 ANNOUNCE_ROLE_NAMES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'announce_role_names.txt')
