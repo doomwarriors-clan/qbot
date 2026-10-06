@@ -266,10 +266,8 @@ async def server_info_poller():
                         winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
                     await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
                     # Clean up live message and state
-                    if alias in live_match_messages:
-                        del live_match_messages[alias]
-                    last_match_info.pop(alias, None)
                     live_match_messages.pop(alias, None)
+                    last_match_info.pop(alias, None)
 
                 last_score_time[alias] = current_score_time
 
