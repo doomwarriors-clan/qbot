@@ -225,11 +225,13 @@ async def server_info_poller():
                     # First detection gets a "Match started" prefix; subsequent
                     # cycles edit the same message in-place.
                     is_new_match = not previous_running
-                    prefix = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
+                    status_text = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
+                    # Put the status inside the embed so it is always visible.
+                    embed.insert_field(index=0, name="Status", value=status_text, inline=False)
                     if alias in live_match_messages:
-                        await live_match_messages[alias].edit(content=prefix, embed=embed)
+                        await live_match_messages[alias].edit(embed=embed)
                     else:
-                        live_match_messages[alias] = await channel.send(content=prefix, embed=embed)
+                        live_match_messages[alias] = await channel.send(embed=embed)
                     # Save state for potential "match ended" post
                     last_match_info[alias] = (serverInfo, playersList)
 
