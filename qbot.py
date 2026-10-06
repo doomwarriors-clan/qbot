@@ -395,6 +395,39 @@ async def q3(context, argument: str):
 
         await context.send(embed=embed)
 
+@bot.command()
+async def statsall(context):
+    """Fetch doomwarriors.de Quake3 stats and post aggregate totals to the channel."""
+    import urllib.request
+
+    url = "https://www.doomwarriors.de/quake3/stats.json?bots=true"
+
+    def _fetch():
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        data = await asyncio.to_thread(_fetch)
+    except Exception as e:
+        await context.send(f"⚠️ Failed to fetch stats: {e}")
+        return
+
+    leaderboard = data.get("leaderboard", [])
+    human_players = [p for p in leaderboard if not p.get("bot", False)]
+    total_kills = sum(p.get("kills", 0) for p in leaderboard)
+    total_damage = sum(p.get("damageGiven", 0) for p in leaderboard)
+
+    lines = [
+        "📊 **DoomWarriors Quake3 Stats**",
+        "─────────────────────────────",
+        f"🔗 Detailed stats: https://www.doomwarriors.de/quake3/stats",
+        f"👥 Total unique Human players: {len(human_players)}",
+        f"⚔️ Total Kills: {total_kills:,}",
+        f"🔥 Total Damage given: {total_damage:,}",
+    ]
+    await context.send("\n".join(lines))
+
+
 def customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap):
     if len(playersList) > 0:
         playersNumber = str(len(playersList)) + '/' + serverInfo['sv_maxclients']
