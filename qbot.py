@@ -227,7 +227,7 @@ async def server_info_poller():
                     is_new_match = not previous_running
                     status_text = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
                     # Put the status inside the embed so it is always visible.
-                    embed.insert_field(index=0, name="Status", value=status_text, inline=False)
+                    embed.insert_field_at(index=0, name="Status", value=status_text, inline=False)
                     if alias in live_match_messages:
                         await live_match_messages[alias].edit(embed=embed)
                     else:
