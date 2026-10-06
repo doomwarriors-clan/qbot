@@ -84,6 +84,10 @@ last_score_time = {}
 # so we can post the final result even if scores reset on the next poll.
 last_match_info = {}
 
+# Stores the live "match in progress" message per alias so we can edit it
+# in-place each poll cycle instead of posting a new message every minute.
+live_match_messages = {}
+
 # Handle to the background poller task, so it survives re-connections and is
 # not garbage-collected. Populated once in on_ready().
 server_info_task = None
@@ -219,10 +223,13 @@ async def server_info_poller():
                     # Add remaining time
                     embed.add_field(name="Time remaining", value=current_score_time, inline=True)
                     # First detection gets a "Match started" prefix; subsequent
-                    # cycles just post the live status.
+                    # cycles edit the same message in-place.
                     is_new_match = not previous_running
                     prefix = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
-                    await channel.send(prefix, embed=embed)
+                    if alias in live_match_messages:
+                        await live_match_messages[alias].edit(content=prefix, embed=embed)
+                    else:
+                        live_match_messages[alias] = await channel.send(prefix, embed=embed)
                     # Save state for potential "match ended" post
                     last_match_info[alias] = (serverInfo, playersList)
 
@@ -261,6 +268,7 @@ async def server_info_poller():
                             winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
                         await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
                     del last_match_info[alias]
+                    live_match_messages.pop(alias, None)
 
                 last_score_time[alias] = current_score_time
 
