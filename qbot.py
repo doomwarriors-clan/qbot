@@ -417,6 +417,8 @@ async def statsall(context):
     total_kills = sum(p.get("kills", 0) for p in leaderboard)
     total_damage = sum(p.get("damageGiven", 0) for p in leaderboard)
 
+    total_mg_shots = sum(p.get("weapons", {}).get("MachineGun", {}).get("shots", 0) for p in leaderboard)
+
     lines = [
         "📊 **Doomwarriors Quake3 Stats**",
         "─────────────────────────────",
@@ -424,6 +426,7 @@ async def statsall(context):
         f"👥 Total unique Human players: {len(human_players)}",
         f"⚔️ Total Kills: {total_kills:,}",
         f"🔥 Total Damage given: {total_damage:,}",
+        f"🔫 Machinegun shots fired: {total_mg_shots:,}",
     ]
     await context.send("\n".join(lines))
 
