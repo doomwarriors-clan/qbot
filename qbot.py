@@ -418,6 +418,12 @@ async def statsall(context):
     total_damage = sum(p.get("damageGiven", 0) for p in leaderboard)
 
     total_mg_shots = sum(p.get("weapons", {}).get("MachineGun", {}).get("shots", 0) for p in leaderboard)
+    total_shotgun = sum(p.get("weapons", {}).get("Shotgun", {}).get("shots", 0) for p in leaderboard)
+    total_rocket = sum(p.get("weapons", {}).get("R.Launcher", {}).get("shots", 0) for p in leaderboard)
+    total_plasma = sum(p.get("weapons", {}).get("Plasmagun", {}).get("shots", 0) for p in leaderboard)
+    total_shaft = sum(p.get("weapons", {}).get("LightningGun", {}).get("shots", 0) for p in leaderboard)
+    total_grenade = sum(p.get("weapons", {}).get("G.Launcher", {}).get("shots", 0) for p in leaderboard)
+    total_rail = sum(p.get("weapons", {}).get("Railgun", {}).get("shots", 0) for p in leaderboard)
 
     lines = [
         "📊 **Doomwarriors Quake3 Stats**",
@@ -427,6 +433,11 @@ async def statsall(context):
         f"⚔️ Total Kills: {total_kills:,}",
         f"🔥 Total Damage given: {total_damage:,}",
         f"🔫 Machinegun shots fired: {total_mg_shots:,}",
+        f"💥 Shotgun shots fired: {total_shotgun:,}",
+        f"🚀 Rockets fired: {total_rocket:,}",
+        f"⚡ Shaft shots fired: {total_shaft:,}",
+        f"🟢 Grenades launched: {total_grenade:,}",
+        f"⚡ Railgun slugs fired: {total_rail:,}",
     ]
     await context.send("\n".join(lines))
 
