@@ -234,28 +234,50 @@ async def server_info_poller():
                     last_match_info[alias] = (serverInfo, playersList)
 
                 elif previous_running and not match_running and channel is not None:
-                    # Match just ended — use the *current* poll's data (server still
-                    # responds, just no longer in a match) for the final score.
+                    # Match just ended — the server may have already reset scores
+                    # to 0:0. Use the current poll's data, but fall back to the last
+                    # saved non-zero state if the server has cleared the scoreboard.
+                    final_info = serverInfo
+                    final_players = playersList
+                    # Detect score reset: all scores are zero
+                    current_total = 0
+                    for p in playersList:
+                        try:
+                            current_total += int(p[0])
+                        except (ValueError, IndexError):
+                            pass
+                    if 'score_red' in serverInfo:
+                        try:
+                            current_total += int(serverInfo['score_red'])
+                        except ValueError:
+                            pass
+                    if 'score_blue' in serverInfo:
+                        try:
+                            current_total += int(serverInfo['score_blue'])
+                        except ValueError:
+                            pass
+                    if current_total == 0 and alias in last_match_info:
+                        final_info, final_players = last_match_info[alias]
                     host, port = _parse_alias_target(server)
-                    name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
-                    currentMap = serverInfo['mapname']
+                    name = re.sub(nameRegex, '', final_info['sv_hostname'])
+                    currentMap = final_info['mapname']
                     embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
-                    is_team_game = serverInfo['g_gametype'] in ('3', '4')
+                    is_team_game = final_info['g_gametype'] in ('3', '4')
                     if is_team_game:
-                        customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
+                        customiseEmbedForTeamGame(embed, final_info, final_players, currentMap)
                     else:
-                        customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
+                        customiseEmbedForGenericGame(embed, final_info, final_players, currentMap)
                     # Determine winner for a friendly summary
                     if is_team_game:
-                        red_score = serverInfo.get('score_red', '0')
-                        blue_score = serverInfo.get('score_blue', '0')
+                        red_score = final_info.get('score_red', '0')
+                        blue_score = final_info.get('score_blue', '0')
                         red_n = int(red_score) if red_score.isdigit() else 0
                         blue_n = int(blue_score) if blue_score.isdigit() else 0
                         winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
                     else:
                         # Non-team game (duel): winner is the player with the highest score
                         best_name, best_score = '—', -1
-                        for p in playersList:
+                        for p in final_players:
                             try:
                                 s = int(p[0])
                             except (ValueError, IndexError):
