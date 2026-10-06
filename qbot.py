@@ -418,7 +418,7 @@ async def statsall(context):
     total_damage = sum(p.get("damageGiven", 0) for p in leaderboard)
 
     lines = [
-        "📊 **DoomWarriors Quake3 Stats**",
+        "📊 **Doomwarriors Quake3 Stats**",
         "─────────────────────────────",
         f"🔗 Detailed stats: https://www.doomwarriors.de/quake3/stats",
         f"👥 Total unique Human players: {len(human_players)}",
