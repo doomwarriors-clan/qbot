@@ -425,21 +425,22 @@ async def statsall(context):
     total_grenade = sum(p.get("weapons", {}).get("G.Launcher", {}).get("shots", 0) for p in leaderboard)
     total_rail = sum(p.get("weapons", {}).get("Railgun", {}).get("shots", 0) for p in leaderboard)
 
-    lines = [
-        "📊 **Doomwarriors Quake3 Stats**",
-        "─────────────────────────────",
-        f"🔗 Detailed stats: https://www.doomwarriors.de/quake3/stats",
-        f"👥 Total unique Human players: {len(human_players)}",
-        f"⚔️ Total Kills: {total_kills:,}",
-        f"🔥 Total Damage given: {total_damage:,}",
-        f"🔫 Machinegun shots fired: {total_mg_shots:,}",
-        f"💥 Shotgun shots fired: {total_shotgun:,}",
-        f"🚀 Rockets fired: {total_rocket:,}",
-        f"⚡ Shaft shots fired: {total_shaft:,}",
-        f"🟢 Grenades launched: {total_grenade:,}",
-        f"⚡ Railgun slugs fired: {total_rail:,}",
-    ]
-    await context.send("\n".join(lines))
+    embed = discord.Embed(
+        title="📊 Doomwarriors Quake3 Stats",
+        url="https://www.doomwarriors.de/quake3/stats",
+        color=discord.Color.dark_teal(),
+    )
+    embed.add_field(name="🔗 Detailed stats", value="[Open stats page](https://www.doomwarriors.de/quake3/stats)", inline=False)
+    embed.add_field(name="👥 Unique Human players", value=str(len(human_players)), inline=False)
+    embed.add_field(name="⚔️ Total Kills", value=f"{total_kills:,}", inline=False)
+    embed.add_field(name="🔥 Total Damage given", value=f"{total_damage:,}", inline=False)
+    embed.add_field(name="🔫 Machinegun shots", value=f"{total_mg_shots:,}", inline=True)
+    embed.add_field(name="💥 Shotgun shots", value=f"{total_shotgun:,}", inline=True)
+    embed.add_field(name="🚀 Rockets", value=f"{total_rocket:,}", inline=True)
+    embed.add_field(name="⚡ Shaft shots", value=f"{total_shaft:,}", inline=True)
+    embed.add_field(name="🟢 Grenades", value=f"{total_grenade:,}", inline=True)
+    embed.add_field(name="⚡ Railgun slugs", value=f"{total_rail:,}", inline=True)
+    await context.send(embed=embed)
 
 
 def customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap):
