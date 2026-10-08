@@ -432,7 +432,7 @@ async def statsall(context):
         ("🔫", "Machinegun shots", total_mg_shots),
         ("💥", "Shotgun shots", total_shotgun),
         ("🚀", "Rockets", total_rocket),
-        ("⚡", "Shaft shots", total_shaft),
+        ("⚡", "Shaft sparks", total_shaft),
         ("🟢", "Grenades", total_grenade),
         ("⚡", "Railgun slugs", total_rail),
     ]
