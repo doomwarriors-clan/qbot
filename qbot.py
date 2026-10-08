@@ -425,21 +425,39 @@ async def statsall(context):
     total_grenade = sum(p.get("weapons", {}).get("G.Launcher", {}).get("shots", 0) for p in leaderboard)
     total_rail = sum(p.get("weapons", {}).get("Railgun", {}).get("shots", 0) for p in leaderboard)
 
+    entries = [
+        ("👥", "Unique Human players", len(human_players)),
+        ("⚔️", "Total Kills", total_kills),
+        ("🔥", "Total Damage given", total_damage),
+        ("🔫", "Machinegun shots", total_mg_shots),
+        ("💥", "Shotgun shots", total_shotgun),
+        ("🚀", "Rockets", total_rocket),
+        ("⚡", "Shaft shots", total_shaft),
+        ("🟢", "Grenades", total_grenade),
+        ("⚡", "Railgun slugs", total_rail),
+    ]
+
+    def _dw(s):
+        w = 0
+        for c in s:
+            o = ord(c)
+            if o == 0xFE0F:
+                w += 0
+            elif o > 0x1F000 or 0x2600 <= o <= 0x27BF:
+                w += 2
+            else:
+                w += 1
+        return w
+
+    labels = [f"{i} {t}" for i, t, _ in entries]
+    max_w = max(_dw(l) for l in labels) + 1
+    desc_lines = [f"{l}{' ' * (max_w - _dw(l))}{v:,}" for l, (_, _, v) in zip(labels, entries)]
+
     embed = discord.Embed(
         title="📊 Doomwarriors Quake3 Stats",
         url="https://www.doomwarriors.de/quake3/stats",
         color=discord.Color.dark_teal(),
-        description=(
-            f"👥 Unique Human players: {len(human_players)}\n"
-            f"⚔️ Total Kills: {total_kills:,}\n"
-            f"🔥 Total Damage given: {total_damage:,}\n"
-            f"🔫 Machinegun shots: {total_mg_shots:,}\n"
-            f"💥 Shotgun shots: {total_shotgun:,}\n"
-            f"🚀 Rockets: {total_rocket:,}\n"
-            f"⚡ Shaft shots: {total_shaft:,}\n"
-            f"🟢 Grenades: {total_grenade:,}\n"
-            f"⚡ Railgun slugs: {total_rail:,}"
-        ),
+        description="```\n" + "\n".join(desc_lines) + "\n```",
     )
     await context.send(embed=embed)
 
