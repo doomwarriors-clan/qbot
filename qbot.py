@@ -45,7 +45,7 @@ aliases = {
     'tdm': 'doomwarriors.de:27961',
     'ctf': 'doomwarriors.de:27962',
 }
-nameRegex = r'\^+[a-z0-9]'
+nameRegex = r'\^+[a-zA-Z0-9]'
 
 # --- Server-info connection announcements -------------------------------------
 # Every POLL_INTERVAL seconds the bot silently queries every server in `aliases`
