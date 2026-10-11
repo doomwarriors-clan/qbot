@@ -522,13 +522,11 @@ def _alignedTeamLines(playersList, name_width, score_width):
 
 
 def buildTeamValue(playersList):
-    """Spectators field value: names left-aligned, scores right-aligned."""
+    """Spectators field value: names only, one per line."""
     if not playersList:  # non-empty fallback so Discord never receives an empty field value
         return '—'
-    names, scores = sortPlayersByScore(playersList)
-    name_width = max(len(name) for name in names) + 1
-    score_width = max(len(score) for score in scores)
-    return '\n'.join(_alignedTeamLines(playersList, name_width, score_width))
+    names, _ = sortPlayersByScore(playersList)
+    return '\n'.join(names)
 
 def buildTeamsValue(team_red, score_red, team_blue, score_blue):
     # One full-width field with Team Red on the left and Team Blue on the right.
