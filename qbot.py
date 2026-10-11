@@ -44,6 +44,7 @@ aliases = {
     'duel': 'doomwarriors.de:27960',
     'tdm': 'doomwarriors.de:27961',
     'ctf': 'doomwarriors.de:27962',
+    'instagib': 'doomwarriors.de:27963'
 }
 nameRegex = r'\^+[a-zA-Z0-9]'
 
