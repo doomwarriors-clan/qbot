@@ -451,7 +451,9 @@ async def statsall(context):
 
     labels = [f"{i} {t}" for i, t, _ in entries]
     max_w = max(_dw(l) for l in labels) + 1
-    desc_lines = [f"{l}{' ' * (max_w - _dw(l))}{v:,}" for l, (_, _, v) in zip(labels, entries)]
+    def _fmt(v):
+        return f"{v:,}".replace(",", ".")
+    desc_lines = [f"{l}{' ' * (max_w - _dw(l))}{_fmt(v)}" for l, (_, _, v) in zip(labels, entries)]
 
     embed = discord.Embed(
         title="📊 Doomwarriors Quake3 Stats",
