@@ -38,15 +38,39 @@ dns.resolver.default_resolver.nameservers = ['1.1.1.1'] #cloudflare dns
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-bot = commands.Bot(command_prefix='!', intents=intents, description='''A simple bot to query Quake 3 servers (protocol 68)''')
+bot = commands.Bot(command_prefix='!', intents=intents, help_command=None, description='''A simple bot to query Quake 3 servers (protocol 68)''')
 
 aliases = {
     'duel': 'doomwarriors.de:27960',
     'tdm': 'doomwarriors.de:27961',
     'ctf': 'doomwarriors.de:27962',
-    'instagib': 'doomwarriors.de:27963'
 }
 nameRegex = r'\^+[a-zA-Z0-9]'
+
+def formatPlayerName(raw_name):
+    """Turn a raw server player name into its display form.
+
+    1. Strips Quake3 '^x' color codes (e.g. '^FFREEZE^ffreeze' -> 'FREEZEfreeze')
+       and any surrounding double quotes.
+    2. Collapses the common '<WORD><word>' double-name style down to just the
+       first word -- but ONLY when both halves are the same word (one is a
+       truncated/cased form of the other):
+         'FREEZEfreeze' -> 'FREEZE'    'DALLIdall' -> 'DALLI'
+       Names made of two *different* words are left untouched, e.g.
+         'KACKspaten' -> 'KACKspaten'   (kack != spaten)
+    """
+    name = re.sub(nameRegex, '', raw_name).strip('"')
+    m = re.match(r'^([A-Z]+)([a-z]+)$', name)
+    if m:
+        upper, lower = m.group(1), m.group(2)
+        u, l = upper.lower(), lower.lower()
+        if u == l:
+            return upper
+        # Same word, different length (e.g. DALLI / dall). Require a 3-char
+        # minimum so unrelated short prefixes ('A'/'apple') never collapse.
+        if min(len(u), len(l)) >= 3 and (u.startswith(l) or l.startswith(u)):
+            return upper
+    return name
 
 # --- Server-info connection announcements -------------------------------------
 # Every POLL_INTERVAL seconds the bot silently queries every server in `aliases`
@@ -190,7 +214,7 @@ async def server_info_poller():
                 serverInfo, playersList = status
 
                 # --- Player connection announcements ---
-                current_players = {re.sub(nameRegex, '', p[2]).strip('"') for p in playersList}
+                current_players = {formatPlayerName(p[2]) for p in playersList}
                 previous_players = last_connected_players.get(alias)
                 if previous_players is not None:  # skip the first (baseline) poll
                     new_players = current_players - previous_players
@@ -227,70 +251,50 @@ async def server_info_poller():
                     # cycles edit the same message in-place.
                     is_new_match = not previous_running
                     prefix = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
+                    embed.description = prefix
                     if alias in live_match_messages:
-                        await live_match_messages[alias].edit(content=prefix, embed=embed)
+                        await live_match_messages[alias].edit(embed=embed)
                     else:
-                        live_match_messages[alias] = await channel.send(prefix, embed=embed)
+                        live_match_messages[alias] = await channel.send(embed=embed)
                     # Save state for potential "match ended" post
                     last_match_info[alias] = (serverInfo, playersList)
 
                 elif previous_running and not match_running and channel is not None:
-                    # Match just ended — the server may have already reset scores
-                    # to 0:0. Use the current poll's data, but fall back to the last
-                    # saved non-zero state if the server has cleared the scoreboard.
-                    final_info = serverInfo
-                    final_players = playersList
-                    # Detect score reset: all scores are zero
-                    current_total = 0
-                    for p in playersList:
-                        try:
-                            current_total += int(p[0])
-                        except (ValueError, IndexError):
-                            pass
-                    if 'score_red' in serverInfo:
-                        try:
-                            current_total += int(serverInfo['score_red'])
-                        except ValueError:
-                            pass
-                    if 'score_blue' in serverInfo:
-                        try:
-                            current_total += int(serverInfo['score_blue'])
-                        except ValueError:
-                            pass
-                    if current_total == 0 and alias in last_match_info:
-                        final_info, final_players = last_match_info[alias]
-                    host, port = _parse_alias_target(server)
-                    name = re.sub(nameRegex, '', final_info['sv_hostname'])
-                    currentMap = final_info['mapname']
-                    embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
-                    is_team_game = final_info['g_gametype'] in ('3', '4')
-                    if is_team_game:
-                        customiseEmbedForTeamGame(embed, final_info, final_players, currentMap)
-                    else:
-                        customiseEmbedForGenericGame(embed, final_info, final_players, currentMap)
-                    # Determine winner for a friendly summary
-                    if is_team_game:
-                        red_score = final_info.get('score_red', '0')
-                        blue_score = final_info.get('score_blue', '0')
-                        red_n = int(red_score) if red_score.isdigit() else 0
-                        blue_n = int(blue_score) if blue_score.isdigit() else 0
-                        winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
-                    else:
-                        # Non-team game (duel): winner is the player with the highest score
-                        best_name, best_score = '—', -1
-                        for p in final_players:
-                            try:
-                                s = int(p[0])
-                            except (ValueError, IndexError):
-                                continue
-                            if s > best_score:
-                                best_score = s
-                                best_name = re.sub(nameRegex, '', p[2]).strip('"')
-                        winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
-                    await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
-                    # Clean up live message and state
+                    # Match just ended — post the final result using saved state
+                    saved = last_match_info.get(alias)
+                    if saved:
+                        saved_info, saved_players = saved
+                        host, port = _parse_alias_target(server)
+                        name = re.sub(nameRegex, '', saved_info['sv_hostname'])
+                        currentMap = saved_info['mapname']
+                        embed = discord.Embed(title=name, colour=0x3c9824, type='rich')
+                        is_team_game = saved_info['g_gametype'] in ('3', '4')
+                        if is_team_game:
+                            customiseEmbedForTeamGame(embed, saved_info, saved_players, currentMap)
+                        else:
+                            customiseEmbedForGenericGame(embed, saved_info, saved_players, currentMap)
+                        # Determine winner for a friendly summary
+                        if is_team_game:
+                            red_score = saved_info.get('score_red', '0')
+                            blue_score = saved_info.get('score_blue', '0')
+                            red_n = int(red_score) if red_score.isdigit() else 0
+                            blue_n = int(blue_score) if blue_score.isdigit() else 0
+                            winner = "🔴 Red" if red_n > blue_n else ("🔵 Blue" if blue_n > red_n else "🤝 Draw")
+                        else:
+                            # Non-team game (duel): winner is the player with the highest score
+                            best_name, best_score = '—', -1
+                            for p in saved_players:
+                                try:
+                                    s = int(p[0])
+                                except (ValueError, IndexError):
+                                    continue
+                                if s > best_score:
+                                    best_score = s
+                                    best_name = formatPlayerName(p[2])
+                            winner = f"🏆 {best_name}" if best_score > 0 else "🤝 Draw"
+                        await channel.send(f"**Match ended** on **{alias}** — {winner} wins!", embed=embed)
+                    del last_match_info[alias]
                     live_match_messages.pop(alias, None)
-                    last_match_info.pop(alias, None)
 
                 last_score_time[alias] = current_score_time
 
@@ -367,7 +371,11 @@ async def q3(context, argument: str):
     ip = query[0]
     port = 27960
     if len(query) > 1:
-        port = int(query[1])
+        try:
+            port = int(query[1])
+        except ValueError:
+            await context.send(f'Invalid port "{query[1]}" — usage: !q3 <alias> or !q3 ip(:port)')
+            return
     if not isValidIp(ip):
         resolvedIps = await resolveHost(ip)
         if len(resolvedIps) == 0:
@@ -384,17 +392,20 @@ async def q3(context, argument: str):
         serverInfo = status[0]
         playersList = status[1]
 
-        name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
-        currentMap = serverInfo['mapname']
-        
-        embed = discord.Embed(title=name, description=ip+':'+str(port), colour=0x3c9824, type='rich')
-        is_team_game = serverInfo['g_gametype'] == '3' or serverInfo['g_gametype'] == '4'
-        if is_team_game:
-            customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
-        else:
-            customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
+        try:
+            name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
+            currentMap = serverInfo['mapname']
 
-        await context.send(embed=embed)
+            embed = discord.Embed(title=name, description=ip+':'+str(port), colour=0x3c9824, type='rich')
+            is_team_game = serverInfo['g_gametype'] == '3' or serverInfo['g_gametype'] == '4'
+            if is_team_game:
+                customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap)
+            else:
+                customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
+            await context.send(embed=embed)
+        except Exception as exc:  # malformed/unexpected server payload: report cleanly instead of a traceback
+            print(f"q3: failed to build status for {ip}:{port}: {type(exc).__name__}: {exc}")
+            await context.send(f'I could not read that server\'s status at {ip}:{port} — its response was malformed or missing expected fields.')
 
 @bot.command()
 async def statsall(context):
@@ -464,6 +475,31 @@ async def statsall(context):
     )
     await context.send(embed=embed)
 
+@bot.command()
+async def help(context):
+    """List available commands and how to use them."""
+    embed = discord.Embed(
+        title='Quake3 Bot — Commands',
+        description='Query live Quake 3 servers and pull aggregate Doomwarriors stats.',
+        colour=0x3c9824,
+    )
+    embed.add_field(
+        name='!q3 <alias | host[:port] | ip[:port]>',
+        value='Live server status — map, player count and scores. Use `!alias` to see known aliases.',
+        inline=False,
+    )
+    embed.add_field(
+        name='!alias',
+        value='List all configured server aliases and their hostnames.',
+        inline=False,
+    )
+    embed.add_field(
+        name='!statsall',
+        value='Post aggregate Quake3 stats from doomwarriors.de — players, kills, damage, per-weapon shots.',
+        inline=False,
+    )
+    embed.set_footer(text='The bot also announces new connections and match results automatically in #server-info.')
+    await context.send(embed=embed)
 
 def customiseEmbedForTeamGame(embed, serverInfo, playersList, currentMap):
     if len(playersList) > 0:
@@ -523,11 +559,13 @@ def _alignedTeamLines(playersList, name_width, score_width):
 
 
 def buildTeamValue(playersList):
-    """Spectators field value: names only, one per line."""
+    """Spectators field value: names left-aligned, scores right-aligned."""
     if not playersList:  # non-empty fallback so Discord never receives an empty field value
         return '—'
-    names, _ = sortPlayersByScore(playersList)
-    return '\n'.join(names)
+    names, scores = sortPlayersByScore(playersList)
+    name_width = max(len(name) for name in names) + 1
+    score_width = max(len(score) for score in scores)
+    return '\n'.join(_alignedTeamLines(playersList, name_width, score_width))
 
 def buildTeamsValue(team_red, score_red, team_blue, score_blue):
     # One full-width field with Team Red on the left and Team Blue on the right.
@@ -573,9 +611,13 @@ def sortPlayersByScore(playersList):
     scores = []
     if len(playersList) > 0:
         for p in playersList:
-            p_name = re.sub(nameRegex, '', p[2])
+            try:
+                score = int(p[0])
+                p_name = formatPlayerName(p[2])
+            except (ValueError, IndexError):
+                continue
             players.append(p_name.strip("\""))
-            scores.append(int(p[0]))
+            scores.append(score)
     converted_scores = np.array(scores)
     indexes = np.argsort(converted_scores)
     reversed_indexes = indexes[::-1]
@@ -624,7 +666,8 @@ def parseServerInfo(serverData: str):
     data = data[1:] # first element is empty as string starts with \\
     serverInfo = {}
     # if len(data) % 2 == 0: # must be even number now
-    for i in range(0, len(data), 2):
+    # stop before the last token so a trailing odd token can't raise IndexError
+    for i in range(0, len(data) - 1, 2):
         key = data[i].lower()
         value = data[i+1]
         serverInfo[key] = value
