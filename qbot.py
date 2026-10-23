@@ -428,6 +428,7 @@ async def statsall(context):
     human_players = [p for p in leaderboard if not p.get("bot", False)]
     total_kills = sum(p.get("kills", 0) for p in leaderboard)
     total_damage = sum(p.get("damageGiven", 0) for p in leaderboard)
+    total_gauntlet = sum(p.get("killsByWeapon", {}).get("Gauntlet", 0) for p in leaderboard)
 
     total_mg_shots = sum(p.get("weapons", {}).get("MachineGun", {}).get("shots", 0) for p in leaderboard)
     total_shotgun = sum(p.get("weapons", {}).get("Shotgun", {}).get("shots", 0) for p in leaderboard)
@@ -441,9 +442,11 @@ async def statsall(context):
         ("👥", "Unique Human players", len(human_players)),
         ("⚔️", "Total Kills", total_kills),
         ("🔥", "Total Damage given", total_damage),
+        ("🗡️", "Gauntlet kills", total_gauntlet),
         ("🔫", "Machinegun shots", total_mg_shots),
         ("💥", "Shotgun shots", total_shotgun),
         ("🚀", "Rockets", total_rocket),
+        ("🌀", "Plasma Shots", total_plasma),
         ("🌩️", "Shaft sparks", total_shaft),
         ("🟢", "Grenades", total_grenade),
         ("🎯", "Railgun slugs", total_rail),
