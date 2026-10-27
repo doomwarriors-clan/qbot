@@ -354,17 +354,52 @@ async def alias(context):
     embed.add_field(name='Hostname', value='\n'.join(ips), inline=True)
     await context.send(embed=embed)
 
+async def send_server_overview(context):
+    """Post a quick one-line-per-server summary of all known aliases.
+
+    Each line is ``alias | players/maxclients | map``. Servers that cannot be
+    reached (offline / unresolvable / misbehaving) are shown as
+    ``alias | — | offline``. All aliases are queried in parallel so the reply
+    stays fast even when a server is down (3 s timeout per server).
+    """
+    async def _one(alias, server):
+        try:
+            status = await _query_alias_status(alias, server)
+        except Exception as exc:  # keep the overview alive regardless of one server's errors
+            print(f"overview: error polling {alias}: {exc}")
+            status = None
+        if status is None:
+            return f"{alias} | — | offline"
+        serverInfo, playersList = status
+        return f"{alias} | {len(playersList)}/{serverInfo.get('sv_maxclients', '?')} | {serverInfo.get('mapname', '?')}"
+
+    lines = await asyncio.gather(*(_one(alias, server) for alias, server in aliases.items()))
+    await context.send('\n'.join(lines))
+
+
 @bot.command()
-async def q3(context, argument: str):
+async def q3(context, argument: str = None):
     if argument == 'help':
-        await context.send('Usage: !q3 <alias> or !q3 ip(:port) or !q3 hostname(:port), type !alias to see a list of known aliases')
+        await context.send('Usage: !q3 (quick overview of all servers) or !q3 <alias> or !q3 ip(:port) or !q3 hostname(:port), type !alias to see a list of known aliases')
         return
-    
+
+    # Bare "!q3" → quick one-line-per-server overview of all known aliases
+    if argument is None or argument.strip() == '':
+        await send_server_overview(context)
+        return
+
     queryServer = argument
+    matched_alias = False
     for key, value in aliases.items(): # check if alias first
         if key == argument:
             queryServer = value
+            matched_alias = True
             break
+    if not matched_alias and ':' not in queryServer and '.' not in queryServer:
+        # Not a known alias and it does not look like a host or IP either
+        # (e.g. a typo) → fall back to the overview of the known servers.
+        await send_server_overview(context)
+        return
 
     # get ip and port
     query = queryServer.strip().split(":")
@@ -487,8 +522,8 @@ async def help(context):
         colour=0x3c9824,
     )
     embed.add_field(
-        name='!q3 <alias | host[:port] | ip[:port]>',
-        value='Live server status — map, player count and scores. Use `!alias` to see known aliases.',
+        name='!q3 [alias | host[:port] | ip[:port]]',
+        value='Live server status — map, player count and scores. A bare `!q3` (or an unknown argument) shows a one-line summary of all known servers. Use `!alias` to see known aliases.',
         inline=False,
     )
     embed.add_field(
