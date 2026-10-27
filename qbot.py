@@ -357,10 +357,13 @@ async def alias(context):
 async def send_server_overview(context):
     """Post a quick one-line-per-server summary of all known aliases.
 
-    Each line is ``alias | players/maxclients | map``. Servers that cannot be
-    reached (offline / unresolvable / misbehaving) are shown as
-    ``alias | — | offline``. All aliases are queried in parallel so the reply
-    stays fast even when a server is down (3 s timeout per server).
+    Sent as a green embed with a fixed-font (monospace) box, like the other
+    qbot outputs. Each line is ``alias | players/maxclients | map`` with the
+    alias column left-aligned and the count column right-aligned so the
+    separators line up. Servers that cannot be reached (offline /
+    unresolvable / misbehaving) are shown as ``alias | — | offline``. All
+    aliases are queried in parallel so the reply stays fast even when a
+    server is down (3 s timeout per server).
     """
     async def _one(alias, server):
         try:
@@ -369,12 +372,24 @@ async def send_server_overview(context):
             print(f"overview: error polling {alias}: {exc}")
             status = None
         if status is None:
-            return f"{alias} | — | offline"
+            return alias, '—', 'offline'
         serverInfo, playersList = status
-        return f"{alias} | {len(playersList)}/{serverInfo.get('sv_maxclients', '?')} | {serverInfo.get('mapname', '?')}"
+        return alias, f"{len(playersList)}/{serverInfo.get('sv_maxclients', '?')}", serverInfo.get('mapname', '?')
 
-    lines = await asyncio.gather(*(_one(alias, server) for alias, server in aliases.items()))
-    await context.send('\n'.join(lines))
+    results = await asyncio.gather(*(_one(alias, server) for alias, server in aliases.items()))
+
+    alias_width = max(len(alias) for alias, _, _ in results)
+    count_width = max(len(count) for _, count, _ in results)
+    lines = [f"{alias.ljust(alias_width)} | {count.rjust(count_width)} | {map_name}"
+             for alias, count, map_name in results]
+
+    embed = discord.Embed(
+        title='📡 Server Overview',
+        colour=0x3c9824,
+        type='rich',
+        description='```\n' + '\n'.join(lines) + '\n```',
+    )
+    await context.send(embed=embed)
 
 
 @bot.command()
