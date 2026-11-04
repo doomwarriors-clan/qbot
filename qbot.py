@@ -183,6 +183,18 @@ def _is_match_running(score_time: str) -> bool:
     return bool(re.match(r'^\d+:\d+$', score_time.strip()))
 
 
+def _is_match_paused(score_time: str) -> bool:
+    """Return True when Score_Time indicates a paused (time-out) match.
+
+    OSP's ``timeout``/``pause``/``time`` client commands freeze the match timer
+    and set Score_Time to ``Timeout``, ``Timeout: RED`` or ``Timeout: BLUE``
+    (DM vs team games) until the pause ends via ``unpause``/``timein``. The
+    match is still running while paused — no result is due.
+    """
+    stripped = re.sub(nameRegex, '', score_time).strip().lower()
+    return stripped.startswith('timeout')
+
+
 async def server_info_poller():
     """Background loop that announces player connections and match starts to ``#server-info``.
 
@@ -191,6 +203,10 @@ async def server_info_poller():
     cycle's, and posts one message per newly-connected player. It also watches
     the Score_Time cvar to detect when a new match starts (transition from a
     non-timer value to a MM:SS countdown) and posts a ``!q3``-style embed.
+    A paused match (OSP time-out: Score_Time ``Timeout``/``Timeout: RED``/
+    ``Timeout: BLUE``) counts as active — the live embed keeps updating with
+    the frozen timer, the running→paused transition is announced once as
+    "Match paused", and no "Match ended" is posted while paused.
     The very first poll per server only records a baseline so players already
     online when the bot starts are not spammed as "connected" and an
     already-running match is not re-announced.
@@ -228,14 +244,22 @@ async def server_info_poller():
                             await channel.send(msg)
                 last_connected_players[alias] = current_players
 
-                # --- Match status: post every cycle while a match is running ---
+                # --- Match status: post every cycle while a match is active ---
+                # "Active" = running (MM:SS countdown) or paused (OSP time-out);
+                # a pause must not look like "match ended", nor trigger a new
+                # "Match started" when the timer resumes.
                 current_score_time = serverInfo.get('score_time', '')
                 previous_score_time = last_score_time.get(alias)
                 match_running = _is_match_running(current_score_time)
+                match_paused = _is_match_paused(current_score_time)
+                match_active = match_running or match_paused
                 previous_running = (previous_score_time is not None
                                    and _is_match_running(previous_score_time))
+                previous_paused = (previous_score_time is not None
+                                   and _is_match_paused(previous_score_time))
+                previous_active = previous_running or previous_paused
 
-                if match_running and channel is not None:
+                if match_active and channel is not None:
                     host, port = _parse_alias_target(server)
                     name = re.sub(nameRegex, '', serverInfo['sv_hostname'])
                     currentMap = serverInfo['mapname']
@@ -247,10 +271,16 @@ async def server_info_poller():
                         customiseEmbedForGenericGame(embed, serverInfo, playersList, currentMap)
                     # Add remaining time
                     embed.add_field(name="Time remaining", value=current_score_time, inline=True)
-                    # First detection gets a "Match started" prefix; subsequent
-                    # cycles edit the same message in-place.
-                    is_new_match = not previous_running
-                    prefix = f"**Match started** on **{alias}**!" if is_new_match else f"**{alias}** update"
+                    # First detection gets a "Match started" prefix; the first
+                    # paused poll after a running one gets "Match paused";
+                    # subsequent cycles edit the same message in-place.
+                    is_new_match = not previous_active
+                    if is_new_match:
+                        prefix = f"**Match started** on **{alias}**!"
+                    elif match_paused and not previous_paused:
+                        prefix = f"**Match paused** on **{alias}**!"
+                    else:
+                        prefix = f"**{alias}** update"
                     embed.description = prefix
                     if alias in live_match_messages:
                         await live_match_messages[alias].edit(embed=embed)
@@ -259,8 +289,9 @@ async def server_info_poller():
                     # Save state for potential "match ended" post
                     last_match_info[alias] = (serverInfo, playersList)
 
-                elif previous_running and not match_running and channel is not None:
-                    # Match just ended — post the final result using saved state
+                elif previous_active and not match_active and channel is not None:
+                    # Match just ended (transition from running/paused to a
+                    # non-active value) — post the final result using saved state
                     saved = last_match_info.get(alias)
                     if saved:
                         saved_info, saved_players = saved
