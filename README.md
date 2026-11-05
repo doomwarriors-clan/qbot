@@ -105,6 +105,11 @@ systemctl --user status qbot          # Zustand
 sudo loginctl enable-linger <user>    # einmalig: Bot überlebt Reboots ohne Login
 ```
 
+> **Status (November 2026):** Der Clan-Server kann derzeit noch nicht direkt von
+> GitHub klonen (Deploy Keys in der Org `doomwarriors-clan` deaktiviert).
+> Bis auf Weiteres wird der Bot daher manuell aktualisiert: aktuelles `qbot.py`
+> auf den Server kopieren, dann `systemctl --user restart qbot`.
+
 ## Dateien
 
 | Datei | Beschreibung |
