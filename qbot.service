@@ -1,0 +1,34 @@
+# qbot.service — systemd *user* unit for the Quake3/Discord match-announcement bot.
+#
+# Canonical copy:  homelab repo -> qbot/qbot.service   (this file)
+# Deployed to:     ~/.config/systemd/user/qbot.service   (hkuehnemund@knecht)
+#
+# SECURITY: the Discord token is NOT in this file and is NOT passed on the command
+#           line. It is read from EnvironmentFile= (.env, mode 0600) and injected
+#           as an environment variable, so it never appears in `ps` / process argv.
+#
+# Manage:
+#   systemctl --user enable --now qbot    # start now + autostart at login
+#   systemctl --user restart qbot
+#   systemctl --user status qbot
+#   journalctl --user -u qbot -f          # follow logs
+#
+# Reboot-persistence (run once, needs sudo/root):
+#   loginctl enable-linger hkuehnemund
+
+[Unit]
+Description=qbot - Quake3 (doomwarriors.de) match-announcement Discord bridge
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/qbot
+EnvironmentFile=%h/qbot/.env
+ExecStart=%h/qbot/.venv/bin/python3.13 qbot.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target
