@@ -1,12 +1,11 @@
 # qbot
 
 Discord-Bot für die Doomwarriors-Clan-Server (doomwarriors.de): Zeigt den
-Live-Status der Quake-3-Server, liefert Gesamt-Statistiken zu Waffen und
+Live-Status der Doomwarriors Quake-3-Server, liefert Gesamt-Statistiken zu Waffen und
 meldet Matches live (Verbindungen, Match-Start/Pause/Ende) im Discord-Server.
 
 **Führende Quelle (leading source):** dieses GitHub-Repo
-(`doomwarriors-clan/qbot`). Eine Kopie wird zusätzlich im privaten homelab-Repo
-auf Forgejo als Git-Submodul (`qbot/`) mitgeführt.
+(`doomwarriors-clan/qbot`). 
 
 ## Funktionen
 
@@ -14,18 +13,18 @@ auf Forgejo als Git-Submodul (`qbot/`) mitgeführt.
 
 | Befehl | Beschreibung |
 |---|---|
-| `!q3` | Einzeiliger Überblick über alle konfigurierten Server (`alias \| Spieler/Max \| Map`), offline: `— \| offline` |
+| `!q3` | Überblick über alle konfigurierten Server, qstat style (`alias \| Spieler/Max \| Map`), offline: `— \| offline` |
 | `!q3 <alias>` | Live-Status eines Servers: Map, Spielerzahl, Punktestand (TDM: Teams + Scoreboard) |
 | `!q3 <host:port>` bzw. `!q3 <ip:port>` | Live-Status eines beliebigen Servers |
-| `!alias` | Liste aller konfigurierten Server-Aliase |
+| `!alias` | Liste aller konfigurierten Server-Aliase (s.u.) |
 | `!statsall` | Aggregierte Stats von doomwarriors.de: Spieler, Kills, Schaden, Schusszahl pro Waffe … |
-| `!help` | Diese Übersicht |
+| `!help` | Diese Übersich |
 
 ### Automatische Meldungen
 
 - **`#server-info`** — der Bot pollt alle konfigurierten Server alle 10 Sekunden:
   - **Verbindungsmeldung**: Erscheint ein neuer Spieler, wird er in `#server-info`
-    angekündigt (mit Rollen-Mentions aus `announce_role_names.txt`).
+    angekündigt (mit Rollen-Mentions / Highlight aus `announce_role_names.txt`).
   - **Match in progress**: Live-Embed (Map, Stand, verbleibende Zeit), das bei jedem
     Poll in-place bearbeitet wird. Eine OSP-`timeout`-Pause wird als
     „**Match paused**“ angezeigt; die Uhr bleibt eingefroren.
@@ -44,6 +43,7 @@ aliases = {
     'ctf':  'doomwarriors.de:27962',
 }
 ```
+TODO: Server in Datei auslagern ...
 
 Zur Konfiguration gehören außerdem:
 
@@ -55,7 +55,7 @@ Zur Konfiguration gehören außerdem:
 
 ## Installation & Betrieb
 
-Der Bot läuft als **systemd-User-Service** auf dem Clan-Server. Die Unit
+Der Bot kann als **systemd-User-Service** auf einem Server mit Internetzugang laufen. Die Unit
 (`qbot.service`) erwartet das Bot-Verzeichnis unter `~/qbot` mit `.venv` und `.env`
 dort.
 
@@ -103,16 +103,6 @@ Nützliche Befehle:
 systemctl --user restart qbot         # Neustart (nach Updates)
 systemctl --user status qbot          # Zustand
 sudo loginctl enable-linger <user>    # einmalig: Bot überlebt Reboots ohne Login
-```
-
-### Bot aktualisieren
-
-Das Repo hier ist die führende Quelle; auf dem Server (knecht) heißt das:
-
-```bash
-cd ~/qbot
-git pull
-systemctl --user restart qbot
 ```
 
 ## Dateien
