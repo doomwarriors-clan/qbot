@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Secrets + logs must NEVER be committed
+.env
+.env.*
+!.env.example
+*.log
+
+# local runtime state
+.qbot.lock
