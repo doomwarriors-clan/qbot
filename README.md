@@ -4,7 +4,6 @@ Discord-Bot für die Doomwarriors-Clan-Server (doomwarriors.de): Zeigt den
 Live-Status der Doomwarriors Quake-3-Server, liefert Gesamt-Statistiken zu Waffen und
 meldet Matches live (Verbindungen, Match-Start/Pause/Ende) im Discord-Server.
 
-**Führende Quelle (leading source):** dieses GitHub-Repo
 (`doomwarriors-clan/qbot`). 
 
 ## Funktionen
