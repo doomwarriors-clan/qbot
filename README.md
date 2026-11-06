@@ -44,6 +44,8 @@ aliases = {
 ```
 TODO: Server in Datei auslagern ...
 
+TODO2: Nur eine config haben in der alle Settings gesetzt werden (highlight, server, welcome text, usw)
+
 Zur Konfiguration gehören außerdem:
 
 - `SERVER_INFO_CHANNEL_NAME` / `WELCOME_CHANNEL_NAME` in `qbot.py` — die Namen der
